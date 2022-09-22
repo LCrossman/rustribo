@@ -14,7 +14,8 @@ at: https://busco-data.ezlab.org/v4/data/lineages/
 
 *The BUSCO datasets are licensed under the Creative Commons Attribution-NoDerivatives 4.0 International License. To view a copy of this license, visit http://creativecommons.org/licenses/by-nd/4.0/ or send a letter to Creative Commons, PO Box 1866, Mountain View, CA 94042, USA*
 
-The Rust version takes a DNA sequence fasta file and provides separate ribosomal sequences for protein or DNA
+The Rust version takes a DNA sequence fasta file and provides concatenated ribosomal sequences for protein or DNA for each genome sequence.
+
 
 USAGE:
    rustribo [OPTIONS] --seqtype <SEQTYPE> --filename <FILENAME> --pathhmm <PATHHMM>
