@@ -3,8 +3,10 @@ Rust version of ribosomal_snakemake
 
 Install Rust, details: https://www.rust-lang.org/tools/install
 
-Using rustup on MacOSX or Unix OS:
+Example installing rustup on MacOSX or Unix OS:
+
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
 check installation with:
 rustc --version
 
