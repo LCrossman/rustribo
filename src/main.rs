@@ -17,11 +17,7 @@ use std::{
 };
 
 #[derive(Parser, Debug)]
-#[clap(
-    author = "LCrossman",
-    version,
-    about = "Ribosomal protein or DNA sequence extraction from DNA sequence file"
-)]
+#[clap(author, version, about)]
 struct Arguments {
     #[clap(short, long, default_value_t = 1)]
     threads: u16,
@@ -29,7 +25,7 @@ struct Arguments {
     seq_type: SequenceType,
     #[clap(short, long)]
     input_file: PathBuf,
-    #[clap(short, long, parse(from_os_str))]
+    #[clap(short, long)]
     pathhmm: PathBuf,
 }
 
@@ -59,12 +55,11 @@ fn fetch_sequence(cds_char: Vec<u8>, strand: &str) -> String {
     sequence
 }
 fn fetch_proteinsequence(cds_char: &[u8], strand: &str) -> String {
-    let sequence = if strand == "-" {
+    if strand == "-" {
         protein_translate::translate(&revcomp(cds_char))
     } else {
         protein_translate::translate(&cds_char)
-    };
-    sequence
+    }
 }
 
 fn concatenated_vector(
