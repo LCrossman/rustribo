@@ -8,7 +8,7 @@ use clap::{Parser, ValueEnum};
 use std::{
     collections::HashMap,
     error::Error,
-    fs::File,
+    fs::{self, File},
     io::{prelude::*, BufReader},
     path::{Path, PathBuf},
     process::{Command, Stdio},
@@ -110,7 +110,7 @@ fn concatenated_vector(
     Ok("".to_string())
 }
 
-fn main() -> Box<dyn Error> {
+fn main() -> Result<(), Box<dyn Error>> {
     let args = Arguments::parse();
     let mut seqsannot: AnnotMap<String, String> = AnnotMap::new();
     let mut predictions = IntervalTree::new();
@@ -153,8 +153,11 @@ fn main() -> Box<dyn Error> {
         );
         nb_bases += record.seq().len();
     }
+
     //println!("file read into records and all into hashmap");
-    let outfilename = format!("{}{}", filename, ".faa");
+
+    let input_file_name = args.input_file.file_name().unwrap().to_str().unwrap();
+    let outfilename = format!("{}{}", input_file_name, ".faa");
     //println!("running gene predictions");
     let output1 = {
         Command::new("prodigal")
@@ -163,7 +166,7 @@ fn main() -> Box<dyn Error> {
             .arg("-a")
             .arg(&outfilename)
             .arg("-i")
-            .arg(&filename)
+            .arg(args.input_file)
             .arg("-p")
             .arg("meta")
             .output()
@@ -219,7 +222,7 @@ fn main() -> Box<dyn Error> {
         ("1572673at2".to_string(), "rplD".to_string()),
         ("1270636at2".to_string(), "rplC".to_string()),
     ]);
-    let outfilehmm = format!("{}{}", &filename, "_hmm.out");
+    let outfilehmm = format!("{}{}", &input_file_name, "_hmm.out");
     //println!("running hmmer");
     let _output4 = {
         let mut child4 = Command::new("hmmsearch")
@@ -263,9 +266,9 @@ fn main() -> Box<dyn Error> {
     //println!("concluded hmmer stuff");
     //println!("hmm_hash {:?}", hmm_hash);
     let num_bases = nb_bases as isize;
-    let p = Path::new(&filename);
-    let mut filname: Vec<&str> = p.to_str().unwrap().split('/').collect::<Vec<&str>>();
-    let filer: String = filname.pop().unwrap().to_string();
+    let p = Path::new(&args.input_file);
+    let mut filename = p.to_str().unwrap().split('/').collect::<Vec<&str>>();
+    let filer: String = filename.pop().unwrap().to_string();
     let mut concatenated_hash: HashMap<String, String> = HashMap::new();
     //println!("num_bases is {:?}", num_bases);
     for inty in predictions.find(0..num_bases) {
