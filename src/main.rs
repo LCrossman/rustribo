@@ -1,11 +1,10 @@
-use anyhow::Context;
 use bio::{
     alphabets::dna::revcomp,
     data_structures::{annot_map::AnnotMap, interval_tree::IntervalTree},
     io::fasta::Reader,
 };
 use bio_types::{annot::contig::Contig, strand::ReqStrand};
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use std::{
     collections::HashMap,
     fs::{self, File},
@@ -16,7 +15,7 @@ use std::{
     vec::Vec,
 };
 
-#[derive(Parser, Default, Debug)]
+#[derive(Parser, Debug)]
 #[clap(
     author = "LCrossman",
     version,
@@ -25,12 +24,18 @@ use std::{
 struct Arguments {
     #[clap(short, long, default_value_t = 1)]
     threads: u16,
-    #[clap(short, long)]
-    seqtype: String,
+    #[clap(short, long, value_enum)]
+    seq_type: SequenceType,
     #[clap(short, long)]
     filename: String,
     #[clap(short, long, parse(from_os_str))]
     pathhmm: std::path::PathBuf,
+}
+
+#[derive(ValueEnum, Clone, Debug)]
+pub enum SequenceType {
+    Dna,
+    Protein,
 }
 
 fn validate_package_name(name: &str) -> Result<(), String> {
@@ -106,18 +111,6 @@ fn concatenated_vector(
 
 fn main() -> io::Result<()> {
     let args = Arguments::parse();
-    //println!("args are parsed");
-    let dna_protein: &str = &args.seqtype;
-    match dna_protein {
-        "dna" | "protein" => {
-            //println!("type is {}", &dna_protein.to_string());
-            ();
-        }
-        _ => {
-            panic!("need to specify dna or protein return type");
-        }
-    }
-    //println!("error handled for the dna protein");
     let filename: String = args.filename;
     let mut seqsannot: AnnotMap<String, String> = AnnotMap::new();
     let mut predictions = IntervalTree::new();
@@ -298,10 +291,9 @@ fn main() -> io::Result<()> {
         let orig_start = sequences[&src].1;
         let sliced_sequence = &recsequence[(start - orig_start) - 1..(end - orig_start)];
         let cds_char = sliced_sequence.as_bytes();
-        let dnaprot_seq = if args.seqtype == "protein" {
-            fetch_proteinsequence(&cds_char, inty.data().1)
-        } else {
-            fetch_sequence(cds_char.to_vec(), inty.data().1)
+        let dnaprot_seq = match args.seq_type {
+            SequenceType::Protein => fetch_sequence(cds_char.to_vec(), inty.data().1),
+            SequenceType::Dna => fetch_proteinsequence(&cds_char, inty.data().1),
         };
         if hmm_hash.contains_key(&inty.data().0) {
             let id = inty.data().0.to_string();
