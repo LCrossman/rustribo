@@ -115,20 +115,15 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut seqsannot: AnnotMap<String, String> = AnnotMap::new();
     let mut predictions = IntervalTree::new();
     //let gff = GFFRecord::default();
-    //println!("file handled");
     let pathhmm = &args.pathhmm;
-    let pathhmm = match File::open(&pathhmm) {
-        Ok(pathhmm) => pathhmm,
-        Err(e) => panic!("Error opening the hmm file {:?}", e),
-    };
+    let pathhmm = File::open(&pathhmm)?;
     //println!("hmmapth handed");
     let mut nb_bases = 0;
     let mut sequences = HashMap::<String, (String, usize, usize)>::new();
-    //println!("initiated hashmap");
     let reader = fasta::Reader::from_file(args.input_file)?;
     //println!("STUCK!!!?? You need to use the DNA sequence fasta and check if you want protein or DNA sequence (prot) and (dna) and You need to change the file prefix in in the line with strip_prefix");
     for record in reader.records() {
-        let record = record.unwrap();
+        let record = record?;
         //build the contig bit here
         let lensy = str::from_utf8(record.seq()).unwrap().len();
         //println!("lens, {:?}, nb_bases {:?}, added {:?}", lensy, nb_bases, nb_bases+lensy);
@@ -145,11 +140,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         let seqstr = record.seq().to_ascii_uppercase();
         sequences.insert(
             recid,
-            (
-                (str::from_utf8(&seqstr).unwrap()).to_string(),
-                nb_bases,
-                lensy,
-            ),
+            ((str::from_utf8(&seqstr)?).to_string(), nb_bases, lensy),
         );
         nb_bases += record.seq().len();
     }
