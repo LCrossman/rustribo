@@ -1,15 +1,16 @@
 use bio::{
     alphabets::dna::revcomp,
     data_structures::{annot_map::AnnotMap, interval_tree::IntervalTree},
-    io::fasta::Reader,
+    io::fasta,
 };
 use bio_types::{annot::contig::Contig, strand::ReqStrand};
 use clap::{Parser, ValueEnum};
 use std::{
     collections::HashMap,
-    fs::{self, File},
-    io::{self, prelude::*, BufReader},
-    path::Path,
+    error::Error,
+    fs::File,
+    io::{prelude::*, BufReader},
+    path::{Path, PathBuf},
     process::{Command, Stdio},
     str,
     vec::Vec,
@@ -27,9 +28,9 @@ struct Arguments {
     #[clap(short, long, value_enum)]
     seq_type: SequenceType,
     #[clap(short, long)]
-    filename: String,
+    input_file: PathBuf,
     #[clap(short, long, parse(from_os_str))]
-    pathhmm: std::path::PathBuf,
+    pathhmm: PathBuf,
 }
 
 #[derive(ValueEnum, Clone, Debug)]
@@ -109,16 +110,11 @@ fn concatenated_vector(
     Ok("".to_string())
 }
 
-fn main() -> io::Result<()> {
+fn main() -> Box<dyn Error> {
     let args = Arguments::parse();
-    let filename: String = args.filename;
     let mut seqsannot: AnnotMap<String, String> = AnnotMap::new();
     let mut predictions = IntervalTree::new();
     //let gff = GFFRecord::default();
-    let file = match File::open(&filename) {
-        Ok(file) => file,
-        Err(e) => panic!("file was found but problem opening the file {:?}", e),
-    };
     //println!("file handled");
     let pathhmm = &args.pathhmm;
     let pathhmm = match File::open(&pathhmm) {
@@ -129,7 +125,7 @@ fn main() -> io::Result<()> {
     let mut nb_bases = 0;
     let mut sequences = HashMap::<String, (String, usize, usize)>::new();
     //println!("initiated hashmap");
-    let reader = Reader::new(file);
+    let reader = fasta::Reader::from_file(args.input_file)?;
     //println!("STUCK!!!?? You need to use the DNA sequence fasta and check if you want protein or DNA sequence (prot) and (dna) and You need to change the file prefix in in the line with strip_prefix");
     for record in reader.records() {
         let record = record.unwrap();
