@@ -35,6 +35,7 @@ pub enum SequenceType {
     Protein,
 }
 
+#[allow(dead_code)]
 fn validate_package_name(name: &str) -> Result<(), String> {
     if name.trim().len() != name.len() {
         Err(String::from(
@@ -51,14 +52,13 @@ fn fetch_sequence(cds_char: Vec<u8>, strand: &str) -> String {
     } else {
         cds_char.to_vec()
     };
-    let sequence = String::from_utf8(seq).unwrap();
-    sequence
+    String::from_utf8(seq).unwrap()
 }
-fn fetch_proteinsequence(cds_char: &[u8], strand: &str) -> String {
+fn fetch_protein_sequence(cds_char: &[u8], strand: &str) -> String {
     if strand == "-" {
         protein_translate::translate(&revcomp(cds_char))
     } else {
-        protein_translate::translate(&cds_char)
+        protein_translate::translate(cds_char)
     }
 }
 
@@ -106,65 +106,63 @@ fn concatenated_vector(
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args = Arguments::parse();
-    let mut seqsannot: AnnotMap<String, String> = AnnotMap::new();
-    let mut predictions = IntervalTree::new();
-    //let gff = GFFRecord::default();
-    let pathhmm = &args.pathhmm;
-    let pathhmm = File::open(&pathhmm)?;
-    //println!("hmmapth handed");
-    let mut nb_bases = 0;
-    let mut sequences = HashMap::<String, (String, usize, usize)>::new();
-    let reader = fasta::Reader::from_file(args.input_file)?;
-    //println!("STUCK!!!?? You need to use the DNA sequence fasta and check if you want protein or DNA sequence (prot) and (dna) and You need to change the file prefix in in the line with strip_prefix");
+
+    // Read the input FASTA file.
+    // Add records into an annotation map and a sequence map.
+    let mut seqsannot = AnnotMap::new();
+    let mut sequences = HashMap::new();
+    let mut num_bases = 0;
+
+    let reader = fasta::Reader::from_file(&args.input_file)?;
     for record in reader.records() {
         let record = record?;
-        //build the contig bit here
-        let lensy = str::from_utf8(record.seq()).unwrap().len();
-        //println!("lens, {:?}, nb_bases {:?}, added {:?}", lensy, nb_bases, nb_bases+lensy);
-        //let recid = format!("{}_{}",record.id().to_string(),i);
-        let recid = format!("{}", record.id().to_string());
-        //println!("so the recid will be {:?}", recid);
+
+        let lensy = str::from_utf8(record.seq())?.len();
         let tma24 = Contig::new(
-            recid[..].to_string(),
-            nb_bases as isize,
+            record.id().to_owned(),
+            num_bases as isize,
             lensy,
             ReqStrand::Forward,
         );
-        seqsannot.insert_at(recid.to_string(), &tma24);
-        let seqstr = record.seq().to_ascii_uppercase();
-        sequences.insert(
-            recid,
-            ((str::from_utf8(&seqstr)?).to_string(), nb_bases, lensy),
-        );
-        nb_bases += record.seq().len();
-    }
 
+        seqsannot.insert_at(record.id().to_owned(), &tma24);
+        sequences.insert(
+            record.id().to_owned(),
+            (
+                str::from_utf8(&record.seq().to_ascii_uppercase())?.to_owned(),
+                num_bases,
+                lensy,
+            ),
+        );
+        num_bases += record.seq().len();
+    }
     //println!("file read into records and all into hashmap");
 
     let input_file_name = args.input_file.file_name().unwrap().to_str().unwrap();
     let outfilename = format!("{}{}", input_file_name, ".faa");
     //println!("running gene predictions");
-    let output1 = {
-        Command::new("prodigal")
-            .arg("-f")
-            .arg("gff")
-            .arg("-a")
-            .arg(&outfilename)
-            .arg("-i")
-            .arg(args.input_file)
-            .arg("-p")
-            .arg("meta")
-            .output()
-            .expect("failed to run gene prediction")
-    };
-    let mut contigname: Vec<&str> = vec![];
+    let output1 = Command::new("prodigal")
+        .arg("-f")
+        .arg("gff")
+        .arg("-a")
+        .arg(&outfilename)
+        .arg("-i")
+        .arg(&args.input_file)
+        .arg("-p")
+        .arg("meta")
+        .output()
+        .expect("failed to run gene prediction");
+
+    let mut contigname = vec![];
     let flott = str::from_utf8(&output1.stdout).unwrap();
     let floot: Vec<&str> = flott.split('\n').collect();
     let mut count: u32 = 1;
+
     //println!("going into prodigal loop");
+    let mut predictions = IntervalTree::new();
     for flo in floot {
         if !flo.starts_with('#') {
-            let prodigal: Vec<&str> = flo.split("\t").collect();
+            let prodigal: Vec<&str> = flo.split('\t').collect();
             if flo.contains("Prodigal") {
                 let id = prodigal[0];
                 count = if !contigname.contains(&id) { 1 } else { count };
@@ -176,9 +174,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                 let strand = prodigal[6];
                 let val = (end as isize) - (start as isize);
                 //println!("this is id sequences get id {:?} {:?}", id, sequences.get(id));
-                for (_x, y, _z) in sequences.get(id) {
+                if let Some((_, y, _)) = sequences.get(id) {
                     let newstart = y;
-                    let addedstart = (newstart + (start as usize)) as isize;
+                    let addedstart = (newstart + start as usize) as isize;
                     //        println!("new start and end {:?} {:?} {:?}", id, addedstart, (addedstart + val));
                     let creat = format!("{}_{}", id, count);
                     //println!("inserting {:?} {:?} {:?}", addedstart, creat, strand);
@@ -209,40 +207,36 @@ fn main() -> Result<(), Box<dyn Error>> {
     ]);
     let outfilehmm = format!("{}{}", &input_file_name, "_hmm.out");
     //println!("running hmmer");
-    let _output4 = {
-        let mut child4 = Command::new("hmmsearch")
-            .arg("--domtblout")
-            .arg(&outfilehmm)
-            .arg("--cpu")
-            .arg(&args.threads.into())
-            .arg("--notextw")
-            .arg("--noali")
-            .arg(&args.pathhmm)
-            .arg(&outfilename)
-            .stdout(Stdio::null())
-            .spawn()
-            .expect("failed searches");
-        //stdout(Stdio::null())
-        let _result4 = child4.wait().unwrap();
-        //println!("concluded hmm run");
-    };
+
+    Command::new("hmmsearch")
+        .arg("--domtblout")
+        .arg(&outfilehmm)
+        .arg("--cpu")
+        .arg(&args.threads.to_string())
+        .arg("--notextw")
+        .arg("--noali")
+        .arg(&args.pathhmm)
+        .arg(&outfilename)
+        .stdout(Stdio::null())
+        .spawn()
+        .expect("failed searches")
+        .wait()?;
+
     let hmmfile = File::open(&outfilehmm)?;
-    let mut hmm_hash: HashMap<String, (String, String)> = HashMap::new();
+    let mut hmm_hash = HashMap::new();
     let hmm_reader = BufReader::new(hmmfile);
     let mut seen_before = vec![];
     //println!("collecting hmmer stuff");
     for hmmline in hmm_reader.lines() {
         //  println!("{:?}", hmmline);
         let hmmline = hmmline.unwrap();
-        if !hmmline.starts_with("#") {
+        if !hmmline.starts_with('#') {
             let hmmoutput: Vec<&str> = hmmline.split_whitespace().collect();
             let id = hmmoutput[0];
             let pfam = hmmoutput[3];
             let acc = hmmoutput[4];
             //  println!("HMM {:?} {:?} {:?}", id.to_string(), pfam.to_string(), acc.to_string());
-            if seen_before.contains(&pfam.to_string()) {
-                ()
-            } else {
+            if !seen_before.contains(&pfam.to_string()) {
                 hmm_hash.insert(id.to_string(), (pfam.to_string(), acc.to_string()));
                 seen_before.push(pfam.to_string());
             }
@@ -250,23 +244,22 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
     //println!("concluded hmmer stuff");
     //println!("hmm_hash {:?}", hmm_hash);
-    let num_bases = nb_bases as isize;
     let p = Path::new(&args.input_file);
     let mut filename = p.to_str().unwrap().split('/').collect::<Vec<&str>>();
     let filer: String = filename.pop().unwrap().to_string();
-    let mut concatenated_hash: HashMap<String, String> = HashMap::new();
+    let mut concatenated_hash = HashMap::new();
     //println!("num_bases is {:?}", num_bases);
-    for inty in predictions.find(0..num_bases) {
-        let mut sourc: Vec<&str> = inty.data().0.split("_").collect();
-        sourc.pop();
+    for inty in predictions.find(0..num_bases as isize) {
+        let mut source: Vec<&str> = inty.data().0.split('_').collect();
+        source.pop();
         //println!("this is sourc length {:?}", sourc.len());
         //println!("so this means that sourc is {:?}", sourc);
         if inty.data().0.contains("rRNA") {
-            sourc.pop()
+            source.pop()
         } else {
             None
         };
-        let src = format!("{}", sourc.join("_"));
+        let src = source.join("_");
         //println!("so now src is {:?}", src);
         let start = inty.interval().start as usize;
         let end = inty.interval().end as usize;
@@ -277,13 +270,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         let cds_char = sliced_sequence.as_bytes();
         let dnaprot_seq = match args.seq_type {
             SequenceType::Protein => fetch_sequence(cds_char.to_vec(), inty.data().1),
-            SequenceType::Dna => fetch_proteinsequence(&cds_char, inty.data().1),
+            SequenceType::Dna => fetch_protein_sequence(cds_char, inty.data().1),
         };
         if hmm_hash.contains_key(&inty.data().0) {
             let id = inty.data().0.to_string();
-            let (pfam, _peef) = hmm_hash
-                .entry(id)
-                .or_insert(("".to_string(), "".to_string()));
+            let (pfam, _peef) = hmm_hash.entry(id).or_default();
             //println!("identifying pfam {:?}", pfam);
             let geney = &pfam_names[&pfam.to_string()];
             //println!("hmmhash now {:?}", &mut hmm_hash);
@@ -293,12 +284,12 @@ fn main() -> Result<(), Box<dyn Error>> {
             //   .skip_while(|s| *s != &p)
             //   .collect();
             //println!("so filname is {:?}", &filer);
-            let fullname = format!("{}|{}", &filer, geney);
+            //let fullname = format!("{}|{}", &filer, geney);
             concatenated_hash.insert(geney.to_string(), dnaprot_seq.clone());
             //println!(">{}\n{}",fullname,dnaprot_seq);
         }
     }
     let result = concatenated_vector(concatenated_hash, filer);
-    println!("{}", result.unwrap_or("".to_string()));
+    println!("{}", result.unwrap_or_else(|_| String::default()));
     Ok(())
 }
