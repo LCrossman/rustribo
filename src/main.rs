@@ -9,7 +9,7 @@ use std::{
     collections::HashMap,
     error::Error,
     fs::{self, File},
-    io::{prelude::*, BufReader},
+    io::{self, prelude::*, BufReader},
     path::{Path, PathBuf},
     process::{Command, Stdio},
     str,
@@ -70,44 +70,43 @@ fn fetch_proteinsequence(cds_char: &[u8], strand: &str) -> String {
 fn concatenated_vector(
     concatenated_hash: HashMap<String, String>,
     filer: String,
-) -> Result<String, ()> {
-    let mut concat_vec: Vec<String> = vec![];
-    let allkeys: Vec<_> = concatenated_hash.keys().cloned().collect();
-    if allkeys.len() != 16 {
+) -> Result<String, io::Error> {
+    let mut concat_vec = vec![];
+
+    if concatenated_hash.len() != 16 {
         let mut missingnamesfile = fs::OpenOptions::new()
             .write(true)
             .append(true)
-            .open("missing_strains.txt")
-            .unwrap();
-        writeln!(missingnamesfile, "{}", filer).unwrap();
-    } else {
-        //println!("OK so the length of allkeys is {}", allkeys.len());
-        let ribo_list: Vec<String> = vec![
-            "rplN".to_string(),
-            "rplP".to_string(),
-            "rplR".to_string(),
-            "rplB".to_string(),
-            "rplV".to_string(),
-            "rplX".to_string(),
-            "rplC".to_string(),
-            "rplD".to_string(),
-            "rplE".to_string(),
-            "rplF".to_string(),
-            "rpsJ".to_string(),
-            "rpsS".to_string(),
-            "rpsC".to_string(),
-            "rpsH".to_string(),
-            "rpsQ".to_string(),
-            "rp10".to_string(),
-        ];
-        for rib in ribo_list {
-            concat_vec.push(concatenated_hash[&rib].to_string());
-        }
-        let full_join = concat_vec.join("");
-        let final_name = format!(">{}\n{}", filer, full_join);
-        return Ok(final_name);
+            .open("missing_strains.txt")?;
+        writeln!(missingnamesfile, "{}", filer)?;
+        return Ok(String::new());
     }
-    Ok("".to_string())
+
+    //println!("OK so the length of allkeys is {}", allkeys.len());
+    let ribo_list = vec![
+        "rplN".to_string(),
+        "rplP".to_string(),
+        "rplR".to_string(),
+        "rplB".to_string(),
+        "rplV".to_string(),
+        "rplX".to_string(),
+        "rplC".to_string(),
+        "rplD".to_string(),
+        "rplE".to_string(),
+        "rplF".to_string(),
+        "rpsJ".to_string(),
+        "rpsS".to_string(),
+        "rpsC".to_string(),
+        "rpsH".to_string(),
+        "rpsQ".to_string(),
+        "rp10".to_string(),
+    ];
+    for rib in ribo_list {
+        concat_vec.push(concatenated_hash[&rib].to_string());
+    }
+    let full_join = concat_vec.join("");
+    let final_name = format!(">{}\n{}", filer, full_join);
+    Ok(final_name)
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
