@@ -23,8 +23,8 @@ use std::{
     about = "Ribosomal protein or DNA sequence extraction from DNA sequence file"
 )]
 struct Arguments {
-    #[clap(short, long, default_value = "1")]
-    threads: String,
+    #[clap(short, long, default_value_t = 1)]
+    threads: u16,
     #[clap(short, long)]
     seqtype: String,
     #[clap(short, long)]
@@ -118,20 +118,6 @@ fn main() -> io::Result<()> {
         }
     }
     //println!("error handled for the dna protein");
-    let threads: &str = &args.threads;
-    //println!("threads collected");
-    let th = threads
-        .trim_end()
-        .parse::<i32>()
-        .context("threads must be an integer value, running with default value 1");
-    if let Err(err) = th {
-        eprintln!("ERROR {}", err);
-        err.chain()
-            .skip(1)
-            .for_each(|cause| eprintln!("because: {}", cause));
-        std::process::exit(1);
-    }
-    //println!("error handled for threads");
     let filename: String = args.filename;
     let mut seqsannot: AnnotMap<String, String> = AnnotMap::new();
     let mut predictions = IntervalTree::new();
@@ -251,7 +237,7 @@ fn main() -> io::Result<()> {
             .arg("--domtblout")
             .arg(&outfilehmm)
             .arg("--cpu")
-            .arg(&threads)
+            .arg(&args.threads.into())
             .arg("--notextw")
             .arg("--noali")
             .arg(&args.pathhmm)
