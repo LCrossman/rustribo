@@ -1,22 +1,20 @@
-use anyhow::{Context, Result};
-use bio::alphabets::dna::revcomp;
-use bio::data_structures::annot_map::AnnotMap;
-use bio::data_structures::interval_tree::IntervalTree;
-use bio::io::fasta::Reader;
-use bio_types::annot::contig::Contig;
-use bio_types::strand::ReqStrand;
+use anyhow::Context;
+use bio::{
+    alphabets::dna::revcomp,
+    data_structures::{annot_map::AnnotMap, interval_tree::IntervalTree},
+    io::fasta::Reader,
+};
+use bio_types::{annot::contig::Contig, strand::ReqStrand};
 use clap::Parser;
-use protein_translate::translate;
-use std::collections::HashMap;
-use std::fs::File;
-use std::fs::OpenOptions;
-use std::io::Write;
-use std::io::{self, prelude::*, BufReader};
-use std::path;
-use std::path::Path;
-use std::process::{Command, Stdio};
-use std::str;
-use std::vec::Vec;
+use std::{
+    collections::HashMap,
+    fs::{self, File},
+    io::{self, prelude::*, BufReader},
+    path::Path,
+    process::{Command, Stdio},
+    str,
+    vec::Vec,
+};
 
 #[derive(Parser, Default, Debug)]
 #[clap(
@@ -56,9 +54,9 @@ fn fetch_sequence(cds_char: Vec<u8>, strand: &str) -> String {
 }
 fn fetch_proteinsequence(cds_char: &[u8], strand: &str) -> String {
     let sequence = if strand == "-" {
-        translate(&revcomp(cds_char))
+        protein_translate::translate(&revcomp(cds_char))
     } else {
-        translate(&cds_char)
+        protein_translate::translate(&cds_char)
     };
     sequence
 }
@@ -70,7 +68,7 @@ fn concatenated_vector(
     let mut concat_vec: Vec<String> = vec![];
     let allkeys: Vec<_> = concatenated_hash.keys().cloned().collect();
     if allkeys.len() != 16 {
-        let mut missingnamesfile = OpenOptions::new()
+        let mut missingnamesfile = fs::OpenOptions::new()
             .write(true)
             .append(true)
             .open("missing_strains.txt")
