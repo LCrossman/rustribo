@@ -1,5 +1,9 @@
 # rustribo
 Rust version of ribosomal_snakemake
+Uses HMMER3 dependency which:
+1. is faster
+2. means it is better for Bacteria than other domains at present
+3. can only be run on x86_64 at this time 
 
 Install Rust, details: https://www.rust-lang.org/tools/install
 
